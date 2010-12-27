@@ -1,16 +1,6 @@
 GEM
   remote: http://rubygems.org/
   specs:
-    activemodel (3.0.3)
-      activesupport (= 3.0.3)
-      builder (~> 2.1.2)
-      i18n (~> 0.4)
-    activeresource (3.0.3)
-      activemodel (= 3.0.3)
-      activesupport (= 3.0.3)
-    activesupport (3.0.3)
-    builder (2.1.2)
-    i18n (0.5.0)
     json (1.4.6)
     mime-types (1.16)
     rb-appscript (0.5.3)
@@ -21,7 +11,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  activeresource
   json
   rb-appscript
   rest-client
