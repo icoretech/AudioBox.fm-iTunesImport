@@ -1,0 +1,8 @@
+## Requirements
+
+gem install bundler
+bundle install
+
+## Usage
+
+ruby itunestoaudiobox.rb -e email -p password
