@@ -1,7 +1,6 @@
 source "http://rubygems.org"
 
 gem 'rest-client'
-gem 'activeresource'
 gem 'json'
 
 if RUBY_PLATFORM =~ /mswin|mingw/
