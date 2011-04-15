@@ -148,7 +148,7 @@ else
     destination_playlist_token = remote_playlist_hash.reject {|k,v| v != playlist.name }.keys.first
     playlist.tracks.each do |t|
       begin
-        track_location   = t.location.get.to_s
+        track_location = CGI::unescape(t.to_hash["Location"].gsub("file://localhost", ""))
         track_hash       = Digest::MD5.hexdigest(File.read(track_location))
         remote_track_res = RestClient::Resource.new("#{AUDIOBOX_API_URL}/tracks/#{track_hash}.json", options.email, options.password).get
         remote_track     = JSON.parse(remote_track_res)
