@@ -24,8 +24,7 @@
 
 require 'rubygems'
 require 'bundler/setup'
-
-require 'appscript'
+require 'itunes/library'
 require 'rest_client'
 require 'json'
 require 'open-uri'
@@ -37,6 +36,7 @@ require 'digest/md5'
 PVERSION = "0.1"
 AUDIOBOX_API_URL = 'http://audiobox.fm/api'
 $KCODE = "u"
+UNWANTED_PLAYLISTS = ["Library", "Music", "Movies", "Podcasts", "Books", "Genius", "iTunes DJ"]
 
 class ParseOptions
   def self.parse(args)
@@ -84,28 +84,24 @@ if options.email.nil? || options.password.nil?
 else
   puts "[AudioBox] iTunes to AudioBox.fm #{PVERSION} running on Ruby #{RUBY_VERSION} (#{RUBY_PLATFORM}), initializing..."
   puts "*"*40
-  # Get iTunes reference.
-  iTunes = Appscript.app("iTunes.app")
-  # Runs iTunes unless if it's already running.
-  iTunes.launch unless iTunes.is_running?
-  # Helper for conditions.
-  whose = Appscript.its
+
+  library = ITunes::Library.load("/Users/Gray/Music/iTunes/iTunes Music Library.xml")
 
   user = JSON.parse(RestClient::Resource.new("#{AUDIOBOX_API_URL}/user.json", :user => options.email, :password => options.password).get)
   puts "[AudioBox] Maximum Portability is set to #{user['user']['profile']['maximum_portability']}"
 
   # Get all tracks.
-  library_tracks = iTunes.library_playlists.first.tracks[whose.video_kind.eq(:none).and(whose.podcast.eq(false))]
+  library_tracks = library.music.tracks.select { |t| t.video? == false }
   # Get remote hashes.
   remote_md5_hashes = RestClient::Resource.new("#{AUDIOBOX_API_URL}/tracks", :user => options.email, :password => options.password).get.split(';')
   puts "[AudioBox] Got hashes list, proceeding."
 
   added_md5 = []
-  library_tracks.get.each do |t|
+  library_tracks.each do |t|
     begin
-      track_location = t.location.get.to_s
+      track_location = CGI::unescape(t.to_hash["Location"].gsub("file://localhost", ""))
       # Check if iTunes track cannot be found on filesystem.
-      next if track_location == 'missing_value'
+      next unless File.exist?(track_location)
       # Calculate the unique hash for this track.
       track_hash = Digest::MD5.hexdigest(File.read(track_location))
       # Avoid importing duplicates.
@@ -114,7 +110,7 @@ else
       assigned_track_token = RestClient::Resource.new("#{AUDIOBOX_API_URL}/tracks", options.email, options.password).post(:media => File.new(track_location))
       added_md5 << track_hash
       # Prints out some debug informations.
-      puts "[AudioBox] #{assigned_track_token}:#{track_hash} #{t.artist.get} - #{t.name.get}"
+      puts "[AudioBox] #{assigned_track_token}:#{track_hash} #{t.artist} - #{t.name}"
     rescue Exception => e
       if e.class == Interrupt
         exit
@@ -135,26 +131,24 @@ else
   end
 
   # Get local custom playlists.
-  custom_playlists      = iTunes.user_playlists[whose.special_kind.eq(:none).and(whose.smart.eq(false))]
-  custom_playlist_ids   = custom_playlists.id_.get
-  custom_playlist_names = custom_playlists.name.get
+  custom_playlists = library.playlists.delete_if {|p| UNWANTED_PLAYLISTS.include?(p.name) }
 
   # Playlist creation.
-  custom_playlist_names.each do |local_playlist_name|
-    unless remote_playlist_names.include?(local_playlist_name)
-      puts "[AudioBox] Creating playlist #{local_playlist_name}."
-      RestClient::Resource.new("#{AUDIOBOX_API_URL}/tracks", options.email, options.password).post(:name => local_playlist_name)
+  custom_playlist.each do |local_playlist|
+    unless remote_playlist_names.include?(local_playlist.name)
+      puts "[AudioBox] Creating playlist #{local_playlist.name}."
+      RestClient::Resource.new("#{AUDIOBOX_API_URL}/tracks", options.email, options.password).post(:name => local_playlist.name)
     else
-      puts "[AudioBox] Skipping playlist #{local_playlist_name} because it already exists."
+      puts "[AudioBox] Skipping playlist #{local_playlist.name} because it already exists."
     end
   end
 
-  custom_playlists.get.each do |playlist|
+  custom_playlists.each do |playlist|
     track_tokens_to_add = []
-    destination_playlist_token = remote_playlist_hash.reject {|k,v| v != iTunes.playlists.ID(playlist.id_.get).name.get.to_s}.keys.first
-    iTunes.playlists.ID(playlist.id_.get).file_tracks.get.each do |t|
+    destination_playlist_token = remote_playlist_hash.reject {|k,v| v != playlist.name }.keys.first
+    playlist.tracks.each do |t|
       begin
-        track_location   = t.location.get.to_s
+        track_location = CGI::unescape(t.to_hash["Location"].gsub("file://localhost", ""))
         track_hash       = Digest::MD5.hexdigest(File.read(track_location))
         remote_track_res = RestClient::Resource.new("#{AUDIOBOX_API_URL}/tracks/#{track_hash}.json", options.email, options.password).get
         remote_track     = JSON.parse(remote_track_res)

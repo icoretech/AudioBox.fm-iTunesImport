@@ -1,9 +1,11 @@
 GEM
   remote: http://rubygems.org/
   specs:
+    itunes-library (0.1.0)
+      plist
     json (1.4.6)
     mime-types (1.16)
-    rb-appscript (0.5.3)
+    plist (3.1.0)
     rest-client (1.6.1)
       mime-types (>= 1.16)
 
@@ -11,6 +13,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  itunes-library
   json
-  rb-appscript
   rest-client
